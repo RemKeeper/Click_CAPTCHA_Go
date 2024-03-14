@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>自定义题目</title>
+    <style>
+        #displayArea {
+            width: 600px;
+            height: 400px;
+            display: none;
+        }
+
+        #mark {
+            position: relative;
+            width: 600px;
+            height: 400px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        h3 {
+            color: #333;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        span {
+            display: block;
+            width: 80%;
+            margin: 10px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        input[type="text"], input[type="file"] {
+            display: block;
+            width: 80%;
+            margin: 10px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            display: block;
+            width: 100px;
+            margin: 10px auto;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #mark {
+            margin: 20px auto;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .markPoint {
+            border: 1px solid #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+<h1>自定义题目</h1>
+
+<input type="text" id="questionText" placeholder="请输入问题">
+
+<input type="file" id="imageUpload" onchange="displayImage(this)">
+<div id="mark">
+    <img id="displayArea" alt="上传图像"/>
+</div>
+
+<h3>点击图片标记答案</h3>
+<button onclick="undoMark()">撤销</button>
+<h3>答案预览</h3>
+<span id="answerPreview"></span>
+<button onclick="submitQuestion()">提交</button>
+<script>
+    let Answers = [];
+    let markIndex = 1;
+
+
+    function displayImage(inputElement) {
+        let file = inputElement.files[0];
+        let reader = new FileReader();
+
+        reader.onloadend = function () {
+            // document.getElementById('displayArea').src = reader.result;
+            let file = document.getElementById('imageUpload').files[0];
+            compressImage(file, 600, 400, function (dataUrl) {
+                // 在这里使用压缩后的图片
+                document.getElementById('displayArea').src = dataUrl;
+            });
+            Answers = [];
+            markIndex = 1;
+            removeMarkPoints();
+            document.getElementById('answerPreview').innerText = JSON.stringify(Answers);
+        }
+
+        if (file) {
+            reader.readAsDataURL(file);
+            document.getElementById('displayArea').style.display = "block";
+        } else {
+            document.getElementById('displayArea').src = "";
+            document.getElementById('displayArea').style.display = "none";
+        }
+    }
+
+    document.getElementById('displayArea').addEventListener('click', getImageClickPosition);
+
+
+    function getImageClickPosition(event) {
+        let x = event.offsetX;
+        let y = event.offsetY;
+        Answers.push({x: x, y: y});
+        document.getElementById('answerPreview').innerText = JSON.stringify(Answers);
+
+        // 创建一个新的div元素作为标记
+
+        let mark = document.createElement('div');
+        // 设置标记的样式
+        mark.classList.add('markPoint');
+        mark.style.width = '10px';
+        mark.style.height = '10px';
+        mark.style.textAlign = 'center';
+        mark.style.lineHeight = '10px';
+        mark.style.color = 'cyan';
+        mark.innerText = String(markIndex++);
+        mark.style.backgroundColor = 'red';
+        mark.style.borderRadius = '50%'; // 使其成为圆形
+        mark.style.position = 'absolute';
+        mark.style.left = x - 5 + 'px';
+        mark.style.top = y - 5 + 'px';
+
+        // 将标记添加到"mark" div中
+        document.getElementById('mark').appendChild(mark);
+    }
+
+    function undoMark() {
+        let mark = document.getElementsByClassName('markPoint');
+        if (mark.length > 0) {
+            document.getElementById('mark').removeChild(mark[mark.length - 1]);
+            Answers.pop();
+            markIndex--;
+            document.getElementById('answerPreview').innerText = JSON.stringify(Answers);
+        }
+    }
+
+    function removeMarkPoints() {
+        // 选择所有具有类名"markPoint"的元素
+        let marks = document.querySelectorAll('.markPoint');
+        // 遍历这些元素
+        marks.forEach(function (mark) {
+            // 删除每一个元素
+            mark.parentNode.removeChild(mark);
+        });
+    }
+
+    function submitQuestion() {
+        // 判断空值
+        if (document.getElementById('questionText').value === '') {
+            alert('问题不能为空');
+            return;
+        }
+        if (document.getElementById('displayArea').src === '') {
+            alert('图片不能为空');
+            return;
+        }
+        if (Answers.length === 0) {
+            alert('答案不能为空');
+            return;
+        }
+        let questionText = document.getElementById('questionText').value;
+        let image = document.getElementById('displayArea').src;
+        let answer = JSON.stringify(Answers);
+        let data = {
+            questionText: questionText,
+            image: image,
+            answer: answer
+        };
+        let xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/addCustomQuestion', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify(data));
+        console.log(JSON.stringify(data));
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                alert('提交成功');
+                Answers = [];
+                markIndex = 1;
+            } else if (xhr.readyState === 4 && xhr.status !== 200) {
+                alert('提交失败');
+            }
+        }
+    }
+
+    function compressImage(file, maxWidth, maxHeight, callback) {
+        let img = new Image();
+        img.onload = function () {
+            let canvas = document.createElement('canvas');
+            let ctx = canvas.getContext('2d');
+
+            let width = img.width;
+            let height = img.height;
+
+            // 如果图片大于目标尺寸，则进行缩放
+            if (width > maxWidth || height > maxHeight) {
+                if (width > height) {
+                    // 宽度大于高度，按宽度缩放
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                } else {
+                    // 高度大于宽度，按高度缩放
+                    width *= maxHeight / height;
+                    height = maxHeight;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // 将图片绘制到canvas上
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 将canvas转换为DataURL
+            let dataUrl = canvas.toDataURL('image/jpeg');
+
+            callback(dataUrl);
+        };
+
+        img.src = URL.createObjectURL(file);
+    }
+
+</script>
+</body>
+</html>
